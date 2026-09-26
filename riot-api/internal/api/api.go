@@ -1,12 +1,20 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
+	"riot-api/internal/account"
+	"riot-api/internal/match"
+	"riot-api/internal/mmr"
 	"strconv"
 )
+
+type requestResult struct {
+	Data   json.RawMessage `json:"data"`
+	Status int32           `json:"status"`
+}
 
 // GetAccountByName возвращает данные пользователя VALORANT по имени и тегу.
 //
@@ -18,10 +26,16 @@ import (
 //
 // query содержит GET query-параметры, которые будут добавлены к URL запроса (опционально):
 //   - force bool — обновить данные или забрать из кеша
-func GetAccountByName(apiKey string, params map[string]string, query map[string]any) {
-	body := baseRequest(apiKey, "https://api.henrikdev.xyz/valorant/v2/account", params, query)
+func GetAccountByName(apiKey string, params map[string]string, query map[string]any) account.Account {
+	result := baseRequest(apiKey, "https://api.henrikdev.xyz/valorant/v2/account", params, query)
 
-	fmt.Println(string(body))
+	var account account.Account
+	err := json.Unmarshal(result.Data, &account)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	fmt.Println(account, result.Status)
+	return account
 }
 
 // GetAccount возвращает данные пользователя VALORANT по идентификатору пользователя.
@@ -34,9 +48,14 @@ func GetAccountByName(apiKey string, params map[string]string, query map[string]
 // query содержит GET query-параметры, которые будут добавлены к URL запроса (опционально):
 //   - force bool — обновить данные или забрать из кеша
 func GetAccount(apiKey string, params map[string]string, query map[string]any) {
-	body := baseRequest(apiKey, "https://api.henrikdev.xyz/valorant/v2/by-puuid/account", params, query)
+	result := baseRequest(apiKey, "https://api.henrikdev.xyz/valorant/v2/by-puuid/account", params, query)
 
-	fmt.Println(string(body))
+	var account account.Account
+	err := json.Unmarshal(result.Data, &account)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	fmt.Println(account, result.Status)
 }
 
 // GetPlayerMMR возвращает рейтинг пользователя VALORANT по идентификатору пользователя.
@@ -48,9 +67,14 @@ func GetAccount(apiKey string, params map[string]string, query map[string]any) {
 //   - platform — платформа игрока (pc, console)
 //   - puuid — идентификатор игрока
 func GetPlayerMMR(apiKey string, params map[string]string) {
-	body := baseRequest(apiKey, "https://api.henrikdev.xyz/valorant/v3/by-puuid/mmr", params, nil)
+	result := baseRequest(apiKey, "https://api.henrikdev.xyz/valorant/v3/by-puuid/mmr", params, nil)
 
-	fmt.Println(string(body))
+	var mmr mmr.MMR
+	err := json.Unmarshal(result.Data, &mmr)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	fmt.Println(mmr, result.Status)
 }
 
 // GetPlayerMatches возвращает матчи пользователя VALORANT по идентификатору пользователя.
@@ -68,9 +92,14 @@ func GetPlayerMMR(apiKey string, params map[string]string) {
 //   - size int32 — количество результатов
 //   - start int32 — начальный индекс для пагинации результатов
 func GetPlayerMatches(apiKey string, params map[string]string, query map[string]any) {
-	body := baseRequest(apiKey, "https://api.henrikdev.xyz/valorant/v3/by-puuid/matches", params, query)
+	result := baseRequest(apiKey, "https://api.henrikdev.xyz/valorant/v4/by-puuid/matches", params, query)
 
-	fmt.Println(string(body))
+	var matches []match.Match
+	err := json.Unmarshal(result.Data, &matches)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	fmt.Println(matches, result.Status)
 }
 
 // GetMatchInfo возвращает данные матча VALORANT по идентификатору матча.
@@ -81,9 +110,14 @@ func GetPlayerMatches(apiKey string, params map[string]string, query map[string]
 //   - affinity — регион игрока (e.g., na, eu, ap, kr)
 //   - match_id — идентификатор матча
 func GetMatchInfo(apiKey string, params map[string]string) {
-	body := baseRequest(apiKey, "https://api.henrikdev.xyz/valorant/v4/match", params, nil)
+	result := baseRequest(apiKey, "https://api.henrikdev.xyz/valorant/v4/match", params, nil)
 
-	fmt.Println(string(body))
+	var match match.Match
+	err := json.Unmarshal(result.Data, &match)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	fmt.Println(match, result.Status)
 }
 
 // Вспомогательные функции
@@ -129,7 +163,7 @@ func setQuery(urlValues url.Values, query map[string]any) {
 	}
 }
 
-func baseRequest(apiKey, url string, params map[string]string, query map[string]any) []byte {
+func baseRequest(apiKey, url string, params map[string]string, query map[string]any) requestResult {
 	endpoint := getEndpoint(url, params)
 
 	req, _ := http.NewRequest(http.MethodGet, endpoint, nil)
@@ -145,8 +179,9 @@ func baseRequest(apiKey, url string, params map[string]string, query map[string]
 
 	res, _ := http.DefaultClient.Do(req)
 
+	var requestResult requestResult
 	defer res.Body.Close()
-	body, _ := io.ReadAll(res.Body)
+	_ = json.NewDecoder(res.Body).Decode(&requestResult)
 
-	return body
+	return requestResult
 }
