@@ -1,5 +1,10 @@
 package match
 
+import (
+	"fmt"
+	"strings"
+)
+
 type Match struct {
 	Kills     []kill     `json:"kills"`
 	Teams     []team     `json:"teams"`
@@ -8,6 +13,64 @@ type Match struct {
 	Coaches   []coache   `json:"coaches"`
 	Metadata  metadata   `json:"metadata"`
 	Observers []observer `json:"observers"`
+}
+
+func (m Match) String() string {
+	var b strings.Builder
+	b.Grow(1024)
+
+	// 1. Метаданные матча
+	b.WriteString("=== VALORANT MATCH SUMMARY ===\n")
+	fmt.Fprintf(&b, "Match ID: %s\n", m.Metadata.MatchID)
+	fmt.Fprintf(&b, "Map:      %s\n", m.Metadata.Map.Name)
+	fmt.Fprintf(&b, "Mode:     %s\n", m.Metadata.Queue.Name)
+	fmt.Fprintf(&b, "Platform: %s (%s)\n", m.Metadata.Platform, m.Metadata.Region)
+	fmt.Fprintf(&b, "Date:     %s\n", m.Metadata.StartedAt)
+	b.WriteString("------------------------------\n")
+
+	// 2. Результаты команд (Счет)
+	b.WriteString("TEAMS SCORE:\n")
+	for _, t := range m.Teams {
+		status := "Lost"
+		if t.Won {
+			status = "WON "
+		}
+		fmt.Fprintf(&b, "  Team %-5s: %d (Status: %s)\n", t.TeamID, t.Rounds.Won, status)
+	}
+	b.WriteString("------------------------------\n")
+
+	// 3. Таблица игроков и их статистика (Leaderboard)
+	b.WriteString("PLAYERS LEADERBOARD:\n")
+	// Исправлено: количество плейсхолдеров (4) теперь строго соответствует аргументам
+	fmt.Fprintf(&b, "  %-16s | %-10s | %-12s | %-5s | K / A / HS | Score\n", "Name", "Team", "Agent", "Rank")
+	b.WriteString("  -----------------------------------------------------------------------\n")
+
+	for _, p := range m.Players {
+		fullName := p.Name
+		if p.Tag != "" {
+			fullName = fmt.Sprintf("%s#%s", p.Name, p.Tag)
+		}
+
+		// Обрезаем длинные ники для ровной таблицы
+		if len(fullName) > 16 {
+			fullName = fullName[:13] + "..."
+		}
+
+		// Форматируем строку статистики: Убийства / Ассисты / Попадания в голову
+		statsStr := fmt.Sprintf("%d / %d / %d", p.Stats.Kills, p.Stats.Assists, p.Stats.Headshots)
+
+		fmt.Fprintf(&b, "  %-16s | %-10s | %-12s | %-5s | %-10s | %d\n",
+			fullName,
+			p.TeamID,
+			p.Agent.Name,
+			p.Tier.Name,
+			statsStr,
+			p.Stats.Score,
+		)
+	}
+	b.WriteString("==============================")
+
+	return b.String()
 }
 
 type coache struct {
@@ -84,19 +147,12 @@ type round struct {
 
 type team struct {
 	Won           bool          `json:"won"`
-	Rounds        []roundShort  `json:"rounds"`
+	Rounds        roundShort    `json:"rounds"`
 	TeamID        string        `json:"team_id"`
 	PremierRoster premierRoster `json:"premier_roster"`
 }
 
 type assistant struct {
-	Tag   string `json:"tag"`
-	Name  string `json:"name"`
-	Team  string `json:"team"`
-	PUUID string `json:"puuid"`
-}
-
-type killer struct {
 	Tag   string `json:"tag"`
 	Name  string `json:"name"`
 	Team  string `json:"team"`
@@ -121,12 +177,9 @@ type playerShort struct {
 	PUUID string `json:"puuid"`
 }
 
-type victim struct {
-	Tag   string `json:"tag"`
-	Name  string `json:"name"`
-	Team  string `json:"team"`
-	PUUID string `json:"puuid"`
-}
+type killer playerShort
+
+type victim playerShort
 
 type weapon struct {
 	ID   string `json:"id"`

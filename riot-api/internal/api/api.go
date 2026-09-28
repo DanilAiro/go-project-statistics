@@ -3,12 +3,15 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"riot-api/internal/account"
 	"riot-api/internal/match"
 	"riot-api/internal/mmr"
 	"strconv"
+	"strings"
+	"time"
 )
 
 type requestResult struct {
@@ -27,7 +30,7 @@ type requestResult struct {
 // query содержит GET query-параметры, которые будут добавлены к URL запроса (опционально):
 //   - force bool — обновить данные или забрать из кеша
 func GetAccountByName(apiKey string, params map[string]string, query map[string]any) account.Account {
-	result := baseRequest(apiKey, "https://api.henrikdev.xyz/valorant/v2/account", params, query)
+	result := baseRequest(apiKey, "https://api.henrikdev.xyz/valorant/v2/account/{name}/{tag}", params, query)
 
 	var account account.Account
 	err := json.Unmarshal(result.Data, &account)
@@ -48,7 +51,7 @@ func GetAccountByName(apiKey string, params map[string]string, query map[string]
 // query содержит GET query-параметры, которые будут добавлены к URL запроса (опционально):
 //   - force bool — обновить данные или забрать из кеша
 func GetAccount(apiKey string, params map[string]string, query map[string]any) {
-	result := baseRequest(apiKey, "https://api.henrikdev.xyz/valorant/v2/by-puuid/account", params, query)
+	result := baseRequest(apiKey, "https://api.henrikdev.xyz/valorant/v2/by-puuid/account/{puuid}", params, query)
 
 	var account account.Account
 	err := json.Unmarshal(result.Data, &account)
@@ -67,7 +70,7 @@ func GetAccount(apiKey string, params map[string]string, query map[string]any) {
 //   - platform — платформа игрока (pc, console)
 //   - puuid — идентификатор игрока
 func GetPlayerMMR(apiKey string, params map[string]string) {
-	result := baseRequest(apiKey, "https://api.henrikdev.xyz/valorant/v3/by-puuid/mmr", params, nil)
+	result := baseRequest(apiKey, "https://api.henrikdev.xyz/valorant/v3/by-puuid/mmr/{affinity}/{platform}/{puuid}", params, nil)
 
 	var mmr mmr.MMR
 	err := json.Unmarshal(result.Data, &mmr)
@@ -92,7 +95,7 @@ func GetPlayerMMR(apiKey string, params map[string]string) {
 //   - size int32 — количество результатов
 //   - start int32 — начальный индекс для пагинации результатов
 func GetPlayerMatches(apiKey string, params map[string]string, query map[string]any) {
-	result := baseRequest(apiKey, "https://api.henrikdev.xyz/valorant/v4/by-puuid/matches", params, query)
+	result := baseRequest(apiKey, "https://api.henrikdev.xyz/valorant/v4/by-puuid/matches/{affinity}/{platform}/{puuid}", params, query)
 
 	var matches []match.Match
 	err := json.Unmarshal(result.Data, &matches)
@@ -110,7 +113,7 @@ func GetPlayerMatches(apiKey string, params map[string]string, query map[string]
 //   - affinity — регион игрока (e.g., na, eu, ap, kr)
 //   - match_id — идентификатор матча
 func GetMatchInfo(apiKey string, params map[string]string) {
-	result := baseRequest(apiKey, "https://api.henrikdev.xyz/valorant/v4/match", params, nil)
+	result := baseRequest(apiKey, "https://api.henrikdev.xyz/valorant/v4/match/{affinity}/{match_id}", params, nil)
 
 	var match match.Match
 	err := json.Unmarshal(result.Data, &match)
@@ -124,12 +127,10 @@ func GetMatchInfo(apiKey string, params map[string]string) {
 func getEndpoint(path string, params map[string]string) string {
 	endpoint := path
 
-	for _, v := range params {
-		endpoint = fmt.Sprintf(
-			"%s/%s",
-			endpoint,
-			url.PathEscape(v),
-		)
+	for k, v := range params {
+		templateKey := fmt.Sprintf("{%s}", k)
+
+		endpoint = strings.ReplaceAll(endpoint, templateKey, url.PathEscape(v))
 	}
 
 	return endpoint
@@ -163,10 +164,21 @@ func setQuery(urlValues url.Values, query map[string]any) {
 	}
 }
 
-func baseRequest(apiKey, url string, params map[string]string, query map[string]any) requestResult {
-	endpoint := getEndpoint(url, params)
+var httpClient = &http.Client{
+	Timeout: 30 * time.Second,
+	Transport: &http.Transport{
+		DisableKeepAlives: true, // Заставляет закрывать TCP-соединение сразу после каждого запроса
+	},
+}
 
-	req, _ := http.NewRequest(http.MethodGet, endpoint, nil)
+func baseRequest(apiKey, urlStr string, params map[string]string, query map[string]any) requestResult {
+	endpoint := getEndpoint(urlStr, params)
+
+	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		fmt.Println("Ошибка создания HTTP-запроса:", err)
+		return requestResult{}
+	}
 
 	if query != nil {
 		urlValues := req.URL.Query()
@@ -177,11 +189,31 @@ func baseRequest(apiKey, url string, params map[string]string, query map[string]
 	req.Header.Set("Authorization", apiKey)
 	req.Header.Set("Accept", "application/json")
 
-	res, _ := http.DefaultClient.Do(req)
-
-	var requestResult requestResult
+	// Выполняем запрос через наш оптимизированный httpClient
+	res, err := httpClient.Do(req)
+	if err != nil {
+		fmt.Println("КРИТИЧЕСКАЯ ОШИБКА СЕТИ (Do):", err)
+		return requestResult{}
+	}
 	defer res.Body.Close()
-	_ = json.NewDecoder(res.Body).Decode(&requestResult)
 
-	return requestResult
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		fmt.Println("Ошибка чтения тела ответа (Stream broken):", err)
+		return requestResult{}
+	}
+
+	if res.StatusCode != http.StatusOK {
+		fmt.Printf("Сервер вернул ошибку. HTTP Статус: %d, Ответ: %s\n", res.StatusCode, string(bodyBytes))
+		return requestResult{Status: int32(res.StatusCode)}
+	}
+
+	var result requestResult
+	err = json.Unmarshal(bodyBytes, &result)
+	if err != nil {
+		fmt.Println("Ошибка декодирования структуры requestResult:", err)
+		return requestResult{}
+	}
+
+	return result
 }
