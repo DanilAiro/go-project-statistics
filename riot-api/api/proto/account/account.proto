@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package account;
+
+option go_package = "/pkg/pb/account";
+
+message AccountByNameRequest {
+    string tag = 1;
+    string name = 2;
+}
+
+message AccountRequest {
+    string puuid = 1;
+}
+
+message Account {
+    string tag = 1;
+    string name = 2;
+    string puuid = 3;
+    string region = 4;
+}
+
+service AccountService {
+    rpc GetAccount(AccountRequest) returns (Account);
+    
+    rpc GetAccountByName(AccountByNameRequest) returns (Account);
+}

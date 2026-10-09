@@ -1,9 +1,14 @@
 package main
 
 import (
+	"log"
+	"net"
 	"riot-api/internal/account"
-	"riot-api/internal/api"
 	"riot-api/internal/config"
+
+	pb "riot-api/pkg/pb/account"
+
+	"google.golang.org/grpc"
 )
 
 func main() {
@@ -18,24 +23,24 @@ func main() {
 
 	// fmt.Println(account)
 
-	account := account.Account{
-		Tag:          "000",
-		Name:         "DanilAiro",
-		Card:         "e6529e9c-4a2b-c31c-7252-e185a8ce4a04",
-		PUUID:        "95529167-bced-547e-bcac-cc245cf01487",
-		Title:        "f3009eb7-4416-39e0-4b66-edb914c7f950",
-		Region:       "eu",
-		UpdatedAt:    "2026-09-28T15:40:06.429Z",
-		Platforms:    []string{"pc", "CONSOLE"},
-		AccountLevel: 91,
-	}
+	// ac := account.Account{
+	// 	Tag:          "000",
+	// 	Name:         "DanilAiro",
+	// 	Card:         "e6529e9c-4a2b-c31c-7252-e185a8ce4a04",
+	// 	PUUID:        "95529167-bced-547e-bcac-cc245cf01487",
+	// 	Title:        "f3009eb7-4416-39e0-4b66-edb914c7f950",
+	// 	Region:       "eu",
+	// 	UpdatedAt:    "2026-09-28T15:40:06.429Z",
+	// 	Platforms:    []string{"pc", "CONSOLE"},
+	// 	AccountLevel: 91,
+	// }
 
-	params := map[string]string{
-		"affinity": account.Region,
-		"platform": account.Platforms[0],
-		"puuid":    account.PUUID,
-		"match_id": "82b03a49-ab30-42a0-a8dc-ec8e444a8d1e",
-	}
+	// params := map[string]string{
+	// 	"affinity": account.Region,
+	// 	"platform": account.Platforms[0],
+	// 	"puuid":    account.PUUID,
+	// 	"match_id": "82b03a49-ab30-42a0-a8dc-ec8e444a8d1e",
+	// }
 
 	// matchesToFetch := 6
 
@@ -47,11 +52,11 @@ func main() {
 
 	// 	fmt.Printf("\n=== ЗАГРУЗКА МАТЧА №%d (Смещение start: %d) ===\n", i+1, i)
 
-	query := map[string]any{
-		"force": true,
-		"size":  1, // Всегда запрашиваем строго по 1 матчу
-		// "start": i, // Сдвигаем индекс: 0 — последний матч, 1 — предпоследний и т.д.
-	}
+	// query := map[string]any{
+	// 	"force": true,
+	// 	"size":  1, // Всегда запрашиваем строго по 1 матчу
+	// 	// "start": i, // Сдвигаем индекс: 0 — последний матч, 1 — предпоследний и т.д.
+	// }
 
 	// 	api.GetPlayerMatches(conf.ValorantAPIKey, params, query)
 	// }
@@ -60,5 +65,20 @@ func main() {
 
 	// api.GetPlayerMMR(conf.ValorantAPIKey, params)
 
-	api.GetAccount(conf.ValorantAPIKey, params, query)
+	// api.GetAccount(conf.ValorantAPIKey, params, query)
+
+	lis, err := net.Listen("tcp", ":50051")
+	if err != nil {
+		log.Fatalf("Не удалось запустить listener: %v", err)
+	}
+
+	grpcServer := grpc.NewServer()
+	accountServer := account.NewAccountServer(conf.ValorantAPIKey)
+
+	pb.RegisterAccountServiceServer(grpcServer, accountServer)
+
+	log.Println("Сервер запущен")
+	if err = grpcServer.Serve(lis); err != nil {
+		log.Fatalf("Ошибка запуска gRPC сервера: %v", err)
+	}
 }

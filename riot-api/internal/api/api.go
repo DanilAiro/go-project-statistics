@@ -6,9 +6,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"riot-api/internal/account"
-	"riot-api/internal/match"
-	"riot-api/internal/mmr"
 	"strconv"
 	"strings"
 	"time"
@@ -29,16 +26,14 @@ type requestResult struct {
 //
 // query содержит GET query-параметры, которые будут добавлены к URL запроса (опционально):
 //   - force bool — обновить данные или забрать из кеша
-func GetAccountByName(apiKey string, params map[string]string, query map[string]any) account.Account {
+func GetAccountByName(apiKey string, params map[string]string, query map[string]any) (json.RawMessage, error) {
 	result := baseRequest(apiKey, "https://api.henrikdev.xyz/valorant/v2/account/{name}/{tag}", params, query)
 
-	var account account.Account
-	err := json.Unmarshal(result.Data, &account)
-	if err != nil {
-		fmt.Println(err.Error())
+	if result.Status != 200 {
+		return nil, fmt.Errorf("запрос не удался")
 	}
-	fmt.Println(account, result.Status)
-	return account
+
+	return result.Data, nil
 }
 
 // GetAccount возвращает данные пользователя VALORANT по идентификатору пользователя.
@@ -50,15 +45,14 @@ func GetAccountByName(apiKey string, params map[string]string, query map[string]
 //
 // query содержит GET query-параметры, которые будут добавлены к URL запроса (опционально):
 //   - force bool — обновить данные или забрать из кеша
-func GetAccount(apiKey string, params map[string]string, query map[string]any) {
+func GetAccount(apiKey string, params map[string]string, query map[string]any) (json.RawMessage, error) {
 	result := baseRequest(apiKey, "https://api.henrikdev.xyz/valorant/v2/by-puuid/account/{puuid}", params, query)
 
-	var account account.Account
-	err := json.Unmarshal(result.Data, &account)
-	if err != nil {
-		fmt.Println(err.Error())
+	if result.Status != 200 {
+		return nil, fmt.Errorf("запрос не удался")
 	}
-	fmt.Println(account, result.Status)
+
+	return result.Data, nil
 }
 
 // GetPlayerMMR возвращает рейтинг пользователя VALORANT по идентификатору пользователя.
@@ -69,15 +63,14 @@ func GetAccount(apiKey string, params map[string]string, query map[string]any) {
 //   - affinity — регион игрока (e.g., na, eu, ap, kr)
 //   - platform — платформа игрока (pc, console)
 //   - puuid — идентификатор игрока
-func GetPlayerMMR(apiKey string, params map[string]string) {
+func GetPlayerMMR(apiKey string, params map[string]string) (json.RawMessage, error) {
 	result := baseRequest(apiKey, "https://api.henrikdev.xyz/valorant/v3/by-puuid/mmr/{affinity}/{platform}/{puuid}", params, nil)
 
-	var mmr mmr.MMR
-	err := json.Unmarshal(result.Data, &mmr)
-	if err != nil {
-		fmt.Println(err.Error())
+	if result.Status != 200 {
+		return nil, fmt.Errorf("запрос не удался")
 	}
-	fmt.Println(mmr, result.Status)
+
+	return result.Data, nil
 }
 
 // GetPlayerMatches возвращает матчи пользователя VALORANT по идентификатору пользователя.
@@ -94,15 +87,14 @@ func GetPlayerMMR(apiKey string, params map[string]string) {
 //   - map string — название карты
 //   - size int32 — количество результатов
 //   - start int32 — начальный индекс для пагинации результатов
-func GetPlayerMatches(apiKey string, params map[string]string, query map[string]any) {
+func GetPlayerMatches(apiKey string, params map[string]string, query map[string]any) (json.RawMessage, error) {
 	result := baseRequest(apiKey, "https://api.henrikdev.xyz/valorant/v4/by-puuid/matches/{affinity}/{platform}/{puuid}", params, query)
 
-	var matches []match.Match
-	err := json.Unmarshal(result.Data, &matches)
-	if err != nil {
-		fmt.Println(err.Error())
+	if result.Status != 200 {
+		return nil, fmt.Errorf("запрос не удался")
 	}
-	fmt.Println(matches, result.Status)
+
+	return result.Data, nil
 }
 
 // GetMatchInfo возвращает данные матча VALORANT по идентификатору матча.
@@ -112,15 +104,14 @@ func GetPlayerMatches(apiKey string, params map[string]string, query map[string]
 // params содержит path-параметры:
 //   - affinity — регион игрока (e.g., na, eu, ap, kr)
 //   - match_id — идентификатор матча
-func GetMatchInfo(apiKey string, params map[string]string) {
+func GetMatchInfo(apiKey string, params map[string]string) (json.RawMessage, error) {
 	result := baseRequest(apiKey, "https://api.henrikdev.xyz/valorant/v4/match/{affinity}/{match_id}", params, nil)
 
-	var match match.Match
-	err := json.Unmarshal(result.Data, &match)
-	if err != nil {
-		fmt.Println(err.Error())
+	if result.Status != 200 {
+		return nil, fmt.Errorf("запрос не удался")
 	}
-	fmt.Println(match, result.Status)
+
+	return result.Data, nil
 }
 
 // Вспомогательные функции
