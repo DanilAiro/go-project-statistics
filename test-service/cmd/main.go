@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	pb "test-service/pkg/pb/account"
+	pb "api-contracts/gen/go/api/proto/account"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"

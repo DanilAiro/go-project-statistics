@@ -1,0 +1,3 @@
+[submodule "api-contracts"]
+	path = api-contracts
+	url = git@github.com:DanilAiro/go-project-statistics-proto.git

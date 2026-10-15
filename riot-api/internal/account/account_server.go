@@ -7,7 +7,7 @@ import (
 
 	"riot-api/internal/api"
 
-	pb "riot-api/pkg/pb/account"
+	pb "api-contracts/gen/go/api/proto/account"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
