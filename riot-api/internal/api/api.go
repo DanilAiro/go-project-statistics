@@ -162,49 +162,88 @@ var httpClient = &http.Client{
 	},
 }
 
+// retryableStatusCodes содержит коды, при которых имеет смысл сделать повторный запрос
+var retryableStatusCodes = map[int]bool{
+	http.StatusTooManyRequests:     true, // 429
+	http.StatusInternalServerError: true, // 500
+	http.StatusBadGateway:          true, // 502
+	http.StatusServiceUnavailable:  true, // 503
+	http.StatusGatewayTimeout:      true, // 504
+}
+
 func baseRequest(apiKey, urlStr string, params map[string]string, query map[string]any) requestResult {
 	endpoint := getEndpoint(urlStr, params)
 
-	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
-	if err != nil {
-		fmt.Println("Ошибка создания HTTP-запроса:", err)
-		return requestResult{}
+	maxRetries := 3
+	baseDelay := 1 * time.Second
+
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		req, err := http.NewRequest(http.MethodGet, endpoint, nil)
+		if err != nil {
+			fmt.Println("Ошибка создания HTTP-запроса:", err)
+			return requestResult{}
+		}
+
+		if query != nil {
+			urlValues := req.URL.Query()
+			setQuery(urlValues, query)
+			req.URL.RawQuery = urlValues.Encode()
+		}
+
+		req.Header.Set("Authorization", apiKey)
+		req.Header.Set("Accept", "application/json")
+
+		res, err := httpClient.Do(req)
+		if err != nil {
+			// Сетевая ошибка (например, таймаут или разрыв соединения)
+			if attempt < maxRetries {
+				delay := baseDelay * time.Duration(1<<uint(attempt)) // Экспоненциальная задержка: 1s, 2s, 4s
+				fmt.Printf("Сетевая ошибка (попытка %d/%d). Повтор через %v: %v\n", attempt+1, maxRetries, delay, err)
+				time.Sleep(delay)
+				continue
+			}
+			fmt.Println("КРИТИЧЕСКАЯ ОШИБКА СЕТИ (исчерпаны попытки):", err)
+			return requestResult{}
+		}
+
+		bodyBytes, _ := io.ReadAll(res.Body)
+		res.Body.Close() // Закрываем тело сразу после чтения
+
+		if retryableStatusCodes[res.StatusCode] && attempt < maxRetries {
+			// Определяем время задержки
+			delay := baseDelay * time.Duration(1<<uint(attempt))
+
+			// Проверяем заголовок Retry-After (может быть в секундах или в виде даты)
+			if retryAfter := res.Header.Get("Retry-After"); retryAfter != "" {
+				if seconds, err := strconv.Atoi(retryAfter); err == nil {
+					delay = time.Duration(seconds) * time.Second
+				} else if t, err := http.ParseTime(retryAfter); err == nil {
+					delay = time.Until(t)
+					if delay < 0 {
+						delay = baseDelay // Если время уже прошло, используем базовую задержку
+					}
+				}
+			}
+
+			fmt.Printf("Получен код %d. Повторный запрос через %v (попытка %d/%d)\n", res.StatusCode, delay, attempt+1, maxRetries)
+			time.Sleep(delay)
+			continue
+		}
+
+		// Если код не из списка retryable или попытки исчерпаны
+		if res.StatusCode != http.StatusOK {
+			fmt.Printf("Сервер вернул ошибку. HTTP Статус: %d, Ответ: %s\n", res.StatusCode, string(bodyBytes))
+			return requestResult{Status: int32(res.StatusCode)}
+		}
+
+		var result requestResult
+		if err := json.Unmarshal(bodyBytes, &result); err != nil {
+			fmt.Println("Ошибка декодирования структуры requestResult:", err)
+			return requestResult{}
+		}
+
+		return result
 	}
 
-	if query != nil {
-		urlValues := req.URL.Query()
-		setQuery(urlValues, query)
-		req.URL.RawQuery = urlValues.Encode()
-	}
-
-	req.Header.Set("Authorization", apiKey)
-	req.Header.Set("Accept", "application/json")
-
-	// Выполняем запрос через наш оптимизированный httpClient
-	res, err := httpClient.Do(req)
-	if err != nil {
-		fmt.Println("КРИТИЧЕСКАЯ ОШИБКА СЕТИ (Do):", err)
-		return requestResult{}
-	}
-	defer res.Body.Close()
-
-	bodyBytes, err := io.ReadAll(res.Body)
-	if err != nil {
-		fmt.Println("Ошибка чтения тела ответа (Stream broken):", err)
-		return requestResult{}
-	}
-
-	if res.StatusCode != http.StatusOK {
-		fmt.Printf("Сервер вернул ошибку. HTTP Статус: %d, Ответ: %s\n", res.StatusCode, string(bodyBytes))
-		return requestResult{Status: int32(res.StatusCode)}
-	}
-
-	var result requestResult
-	err = json.Unmarshal(bodyBytes, &result)
-	if err != nil {
-		fmt.Println("Ошибка декодирования структуры requestResult:", err)
-		return requestResult{}
-	}
-
-	return result
+	return requestResult{}
 }
