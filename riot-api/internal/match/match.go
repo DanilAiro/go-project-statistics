@@ -10,7 +10,7 @@ type Match struct {
 	Teams     []team     `json:"teams"`
 	Rounds    []round    `json:"rounds"`
 	Players   []player   `json:"players"`
-	Coaches   []coache   `json:"coaches"`
+	Coaches   []coach    `json:"coaches"`
 	Metadata  metadata   `json:"metadata"`
 	Observers []observer `json:"observers"`
 }
@@ -73,7 +73,7 @@ func (m Match) String() string {
 	return b.String()
 }
 
-type coache struct {
+type coach struct {
 	PUUID  string `json:"puuid"`
 	TeamID string `json:"team_id"`
 }
@@ -201,11 +201,6 @@ type queue struct {
 	ID       string `json:"id"`
 	Name     string `json:"name"`
 	ModeType string `json:"mode_type"`
-}
-
-type season struct {
-	ID    string `json:"id"`
-	Short string `json:"short"`
 }
 
 type abilityCasts struct {
