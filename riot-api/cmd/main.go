@@ -5,8 +5,10 @@ import (
 	"net"
 	"riot-api/internal/account"
 	"riot-api/internal/config"
+	"riot-api/internal/match"
 
-	pb "api-contracts/gen/go/api/proto/account"
+	accountpb "api-contracts/gen/go/api/proto/account"
+	matchpb "api-contracts/gen/go/api/proto/match"
 
 	"google.golang.org/grpc"
 )
@@ -22,8 +24,10 @@ func main() {
 
 	grpcServer := grpc.NewServer()
 	accountServer := account.NewAccountServer(conf.ValorantAPIKey)
+	matchServer := match.NewMatchServer(conf.ValorantAPIKey)
 
-	pb.RegisterAccountServiceServer(grpcServer, accountServer)
+	accountpb.RegisterAccountServiceServer(grpcServer, accountServer)
+	matchpb.RegisterMatchServiceServer(grpcServer, matchServer)
 
 	log.Println("Сервер запущен")
 	if err = grpcServer.Serve(lis); err != nil {
