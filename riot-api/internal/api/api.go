@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -180,7 +181,8 @@ func baseRequest(apiKey, urlStr string, params map[string]string, query map[stri
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		req, err := http.NewRequest(http.MethodGet, endpoint, nil)
 		if err != nil {
-			fmt.Println("Ошибка создания HTTP-запроса:", err)
+			msg := fmt.Sprintf("Ошибка создания HTTP-запроса: %v", err)
+			slog.Warn(msg)
 			return requestResult{}
 		}
 
@@ -198,11 +200,15 @@ func baseRequest(apiKey, urlStr string, params map[string]string, query map[stri
 			// Сетевая ошибка (например, таймаут или разрыв соединения)
 			if attempt < maxRetries {
 				delay := baseDelay * time.Duration(1<<uint(attempt)) // Экспоненциальная задержка: 1s, 2s, 4s
-				fmt.Printf("Сетевая ошибка (попытка %d/%d). Повтор через %v: %v\n", attempt+1, maxRetries, delay, err)
+
+				msg := fmt.Sprintf("Сетевая ошибка (попытка %d/%d). Повтор через %v: %v\n", attempt+1, maxRetries, delay, err)
+				slog.Warn(msg)
+
 				time.Sleep(delay)
 				continue
 			}
-			fmt.Println("КРИТИЧЕСКАЯ ОШИБКА СЕТИ (исчерпаны попытки):", err)
+			msg := fmt.Sprintf("КРИТИЧЕСКАЯ ОШИБКА СЕТИ (исчерпаны попытки): %v", err)
+			slog.Warn(msg)
 			return requestResult{}
 		}
 
@@ -225,20 +231,24 @@ func baseRequest(apiKey, urlStr string, params map[string]string, query map[stri
 				}
 			}
 
-			fmt.Printf("Получен код %d. Повторный запрос через %v (попытка %d/%d)\n", res.StatusCode, delay, attempt+1, maxRetries)
+			msg := fmt.Sprintf("Получен код %d. Повторный запрос через %v (попытка %d/%d)\n", res.StatusCode, delay, attempt+1, maxRetries)
+			slog.Warn(msg)
+
 			time.Sleep(delay)
 			continue
 		}
 
 		// Если код не из списка retryable или попытки исчерпаны
 		if res.StatusCode != http.StatusOK {
-			fmt.Printf("Сервер вернул ошибку. HTTP Статус: %d, Ответ: %s\n", res.StatusCode, string(bodyBytes))
+			msg := fmt.Sprintf("Сервер вернул ошибку. HTTP Статус: %d, Ответ: %s\n", res.StatusCode, string(bodyBytes))
+			slog.Warn(msg)
 			return requestResult{Status: int32(res.StatusCode)}
 		}
 
 		var result requestResult
 		if err := json.Unmarshal(bodyBytes, &result); err != nil {
-			fmt.Println("Ошибка декодирования структуры requestResult:", err)
+			msg := fmt.Sprintf("Ошибка декодирования структуры requestResult: %v", err)
+			slog.Warn(msg)
 			return requestResult{}
 		}
 
