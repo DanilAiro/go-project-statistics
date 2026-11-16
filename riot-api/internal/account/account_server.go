@@ -25,15 +25,13 @@ func NewAccountServer(apiKey string) *server {
 
 func (s *server) GetAccount(ctx context.Context, req *pb.AccountRequest) (*pb.Account, error) {
 	puuid := req.GetPuuid()
+	force := req.GetForce()
+
 	if puuid == "" {
 		return nil, status.Error(codes.InvalidArgument, "PUUID пустой")
 	}
 
-	params := map[string]string{
-		"puuid": puuid,
-	}
-
-	data, err := api.GetAccount(s.apiKey, params, nil)
+	data, err := api.GetAccount(s.apiKey, puuid, force)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "ошибка запроса аккаунта: %v", err)
 	}
@@ -44,6 +42,7 @@ func (s *server) GetAccount(ctx context.Context, req *pb.AccountRequest) (*pb.Ac
 func (s *server) GetAccountByName(ctx context.Context, req *pb.AccountByNameRequest) (*pb.Account, error) {
 	name := req.GetName()
 	tag := req.GetTag()
+	force := req.GetForce()
 
 	if name == "" {
 		return nil, status.Error(codes.InvalidArgument, "Name пустой")
@@ -52,12 +51,7 @@ func (s *server) GetAccountByName(ctx context.Context, req *pb.AccountByNameRequ
 		return nil, status.Error(codes.InvalidArgument, "Tag пустой")
 	}
 
-	params := map[string]string{
-		"name": name,
-		"tag":  tag,
-	}
-
-	data, err := api.GetAccountByName(s.apiKey, params, nil)
+	data, err := api.GetAccountByName(s.apiKey, name, tag, force)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "ошибка запроса аккаунта: %v", err)
 	}

@@ -32,6 +32,10 @@ func (s *server) GetPlayerMatches(
 	puuid := req.GetPuuid()
 	affinity := req.GetAffinity()
 	platform := req.GetPlatform()
+	mode := req.GetMode()
+	mapName := req.GetMap()
+	size := req.GetSize()
+	start := req.GetStart()
 
 	if puuid == "" {
 		return nil, status.Error(codes.InvalidArgument, "PUUID пустой")
@@ -45,31 +49,7 @@ func (s *server) GetPlayerMatches(
 		return nil, status.Error(codes.InvalidArgument, "Platform пустой")
 	}
 
-	params := map[string]string{
-		"puuid":    puuid,
-		"affinity": affinity,
-		"platform": platform,
-	}
-
-	query := make(map[string]any)
-
-	if req.Mode != nil {
-		query["mode"] = req.GetMode()
-	}
-
-	if req.Map != nil {
-		query["map"] = req.GetMap()
-	}
-
-	if req.Size != nil {
-		query["size"] = req.GetSize()
-	}
-
-	if req.Start != nil {
-		query["start"] = req.GetStart()
-	}
-
-	data, err := api.GetPlayerMatches(s.apiKey, params, query)
+	data, err := api.GetPlayerMatches(s.apiKey, affinity, platform, puuid, mode, mapName, size, start)
 	if err != nil {
 		return nil, err
 	}
@@ -113,12 +93,7 @@ func (s *server) GetMatchInfo(
 		return nil, status.Error(codes.InvalidArgument, "Match ID пустой")
 	}
 
-	params := map[string]string{
-		"affinity": affinity,
-		"match_id": matchID,
-	}
-
-	data, err := api.GetMatchInfo(s.apiKey, params)
+	data, err := api.GetMatchInfo(s.apiKey, affinity, matchID)
 	if err != nil {
 		return nil, err
 	}

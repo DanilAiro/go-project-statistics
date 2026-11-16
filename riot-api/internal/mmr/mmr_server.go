@@ -44,13 +44,7 @@ func (s *server) GetMMR(ctx context.Context, req *pb.MMRRequest) (*pb.MMR, error
 		return nil, status.Error(codes.InvalidArgument, "Platform должен быть pc или console")
 	}
 
-	params := map[string]string{
-		"affinity": affinity,
-		"platform": platform,
-		"puuid":    puuid,
-	}
-
-	data, err := api.GetPlayerMMR(s.apiKey, params)
+	data, err := api.GetPlayerMMR(s.apiKey, affinity, platform, puuid)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "ошибка запроса MMR: %v", err)
 	}

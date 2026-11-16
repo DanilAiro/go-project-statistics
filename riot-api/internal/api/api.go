@@ -27,7 +27,15 @@ type requestResult struct {
 //
 // query содержит GET query-параметры, которые будут добавлены к URL запроса (опционально):
 //   - force bool — обновить данные или забрать из кеша
-func GetAccountByName(apiKey string, params map[string]string, query map[string]any) (json.RawMessage, error) {
+func GetAccountByName(apiKey, name, tag string, force bool) (json.RawMessage, error) {
+	params := map[string]string{
+		"name": name,
+		"tag":  tag,
+	}
+
+	query := make(map[string]any)
+	query["force"] = force
+
 	result := baseRequest(apiKey, "https://api.henrikdev.xyz/valorant/v2/account/{name}/{tag}", params, query)
 
 	if result.Status != 200 {
@@ -46,7 +54,14 @@ func GetAccountByName(apiKey string, params map[string]string, query map[string]
 //
 // query содержит GET query-параметры, которые будут добавлены к URL запроса (опционально):
 //   - force bool — обновить данные или забрать из кеша
-func GetAccount(apiKey string, params map[string]string, query map[string]any) (json.RawMessage, error) {
+func GetAccount(apiKey, puuid string, force bool) (json.RawMessage, error) {
+	params := map[string]string{
+		"puuid": puuid,
+	}
+
+	query := make(map[string]any)
+	query["force"] = force
+
 	result := baseRequest(apiKey, "https://api.henrikdev.xyz/valorant/v2/by-puuid/account/{puuid}", params, query)
 
 	if result.Status != 200 {
@@ -64,7 +79,13 @@ func GetAccount(apiKey string, params map[string]string, query map[string]any) (
 //   - affinity — регион игрока (e.g., na, eu, ap, kr)
 //   - platform — платформа игрока (pc, console)
 //   - puuid — идентификатор игрока
-func GetPlayerMMR(apiKey string, params map[string]string) (json.RawMessage, error) {
+func GetPlayerMMR(apiKey, affinity, platform, puuid string) (json.RawMessage, error) {
+	params := map[string]string{
+		"affinity": affinity,
+		"platform": platform,
+		"puuid":    puuid,
+	}
+
 	result := baseRequest(apiKey, "https://api.henrikdev.xyz/valorant/v3/by-puuid/mmr/{affinity}/{platform}/{puuid}", params, nil)
 
 	if result.Status != 200 {
@@ -85,10 +106,22 @@ func GetPlayerMMR(apiKey string, params map[string]string) (json.RawMessage, err
 //
 // query содержит GET query-параметры, которые будут добавлены к URL запроса (опционально):
 //   - mode string — игровой режим
-//   - map string — название карты
+//   - mapName string — название карты
 //   - size int32 — количество результатов
 //   - start int32 — начальный индекс для пагинации результатов
-func GetPlayerMatches(apiKey string, params map[string]string, query map[string]any) (json.RawMessage, error) {
+func GetPlayerMatches(apiKey, affinity, platform, puuid, mode, mapName string, size, start int32) (json.RawMessage, error) {
+	params := map[string]string{
+		"affinity": affinity,
+		"platform": platform,
+		"puuid":    puuid,
+	}
+
+	query := make(map[string]any)
+	query["mode"] = mode
+	query["mapName"] = mapName
+	query["size"] = size
+	query["start"] = start
+
 	result := baseRequest(apiKey, "https://api.henrikdev.xyz/valorant/v4/by-puuid/matches/{affinity}/{platform}/{puuid}", params, query)
 
 	if result.Status != 200 {
@@ -105,7 +138,12 @@ func GetPlayerMatches(apiKey string, params map[string]string, query map[string]
 // params содержит path-параметры:
 //   - affinity — регион игрока (e.g., na, eu, ap, kr)
 //   - match_id — идентификатор матча
-func GetMatchInfo(apiKey string, params map[string]string) (json.RawMessage, error) {
+func GetMatchInfo(apiKey, affinity, match_id string) (json.RawMessage, error) {
+	params := map[string]string{
+		"affinity": affinity,
+		"match_id": match_id,
+	}
+
 	result := baseRequest(apiKey, "https://api.henrikdev.xyz/valorant/v4/match/{affinity}/{match_id}", params, nil)
 
 	if result.Status != 200 {
